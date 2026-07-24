@@ -1,32 +1,12 @@
-/*
-Copyright (c) 2004-2021, Lode Vandevenne
 
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-    * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-#include <math.h>
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <raylib.h>
-
-#define DEGREE_TO_RADIANS(X)(X * PI/180)
+#include <math.h>
+const float  PI_DIV_180 = PI / 180.0; 
+#define DEGREE_TO_RADIANS(X)(X * PI_DIV_180)
 
 
 /*
@@ -51,19 +31,18 @@ typedef struct{
 }texture_t;
 
 typedef struct{
-  double x;
-  double y;
-  double fov;
-  double pa;
-  double mv_speed;
-  double mse_sens;
+  float x;
+  float y;
+  float fov;
+  float half_fov;
+  float pa;
+  float mv_speed;
+  float mse_sens;
 }player_t;
-player_t player = {2.0,2.0,90,90.0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
-double g_time;
-double old_time;
+player_t player = {2.0,2.0,90,45,90.0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
 struct{
-  double increment_angle;
-  double prec;
+  float increment_angle;
+  float prec;
 }rc_data = {.prec = 64.0};
 struct{
   int width;
@@ -80,7 +59,7 @@ struct{
   int half_width;
 }project = {0};
 texture_t skybox = {.width = 64, .height = 64};
-double skybox_y_inc;
+float skybox_y_inc;
 texture_t floor_text = {0};
 texture_t loaded_textures[100];
 
@@ -106,7 +85,7 @@ unsigned int worldMap[10][10] =
 
 
 void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture){
-  double y_inc = (wall_height * 2) / texture.height;
+  float y_inc = (wall_height * 2) / texture.height;
   int col = (texture_x * texture.height);
   for(int i = 0;i < texture.height;i++){
 	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]);
@@ -116,7 +95,7 @@ void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t te
   }
 }
 void draw_skybox(unsigned int skybox_pos,int x,int wall_y){
-  double y = 0;
+  float y = 0;
   int row = skybox_pos * skybox.width;
   skybox_pos = skybox_pos & skybox.width - 1;
   for(int i = 0;i < skybox.height && y < wall_y;i++){
@@ -144,19 +123,22 @@ Color *convert_image_to_colum_major(Image img){
   // UnloadImageColors(contents);
   return ret;
 }
+
 void raycast(){
-  double half_fov = player.fov / 2;
-  double ray_angle = player.pa - half_fov;
+  float ray_angle = player.pa - player.half_fov;
   BeginDrawing();
   ClearBackground(GRAY);
   for(int ray_cnt = 0;ray_cnt < project.width;ray_cnt++){
-	double rayCos = cos(DEGREE_TO_RADIANS(ray_angle)) /* / rc_data.prec */;
-	double raySin = sin(DEGREE_TO_RADIANS(ray_angle)) /* / rc_data.prec */;
+   	/* float rayCos = fast_cosine(ray_angle) /\* / rc_data.prec *\/; */
+	/* float raySin = fast_sin(ray_angle) /\* / rc_data.prec *\/; */
+	float rayCos /* = cosf(DEGREE_TO_RADIANS(ray_angle)); */;
+	float raySin /*= sinf(DEGREE_TO_RADIANS(ray_angle)); */;
+	sincosf(DEGREE_TO_RADIANS(ray_angle),&raySin,&rayCos);
 	int wall = 0;
-	double delta_dist_x = fabs(1 / rayCos);
-	double delta_dist_y = fabs(1/ raySin);
-	double side_dist_x;
-	double side_dist_y;
+	float delta_dist_x = fabs(1 / rayCos);
+	float delta_dist_y = fabs(1/ raySin);
+	float side_dist_x;
+	float side_dist_y;
 	int step_x;
 	int step_y;
 	int mapx = (int)player.x;
@@ -164,17 +146,17 @@ void raycast(){
 	int side;
 	if(rayCos < 0){
 	  step_x = -1;
-	  side_dist_x = (player.x - (double)mapx) *delta_dist_x;
+	  side_dist_x = (player.x - (float)mapx) *delta_dist_x;
 	}else{
 	  step_x = 1;
-	  side_dist_x = ((double)mapx + 1.0 - player.x) * delta_dist_x;
+	  side_dist_x = ((float)mapx + 1.0 - player.x) * delta_dist_x;
 	}
 	if(raySin < 0){
 	  step_y = -1;
-	  side_dist_y = (player.y - (double)mapy) *delta_dist_y;
+	  side_dist_y = (player.y - (float)mapy) *delta_dist_y;
 	}else{
 	  step_y = 1;
-	  side_dist_y = ((double)mapy + 1.0 - player.y) * delta_dist_y;
+	  side_dist_y = ((float)mapy + 1.0 - player.y) * delta_dist_y;
 	}
 	while(!wall){
 	  if(side_dist_x < side_dist_y){
@@ -188,9 +170,8 @@ void raycast(){
 	  }
 	  wall = worldMap[mapy][mapx];
 	}
-	double dist;
-	Color clr = BLUE;
-	double hitx;
+	float dist;
+	float hitx;
 	if(side == 0){
 	  dist = (side_dist_x - delta_dist_x);
 	  hitx = player.y + (dist * raySin);
@@ -201,7 +182,7 @@ void raycast(){
 	  hitx -= floor(hitx);
 	}
 
-	double wall_height = (double)project.half_height / dist;
+	float wall_height = (float)project.half_height / dist;
 	//Color color_map[6] = {GREEN,RED,BLUE,WHITE,RAYWHITE,PURPLE};
 	Vector2 wall_pos = {.x = ray_cnt, .y = project.half_height - wall_height};
 
@@ -213,59 +194,59 @@ void raycast(){
 	  if(skybox_pos < 0){
 		skybox_pos = 0;
 	  }
-	  printf("\n%d: wall=%d dist=%f wall_ind = %d,%d hitx = %lf player_pos = %lf,%lf player_angle = %lf skybox_x = %d\n", ray_cnt, wall,hitx, dist,mapx,mapy,player.x,player.y,player.pa,skybox_pos); 
+	  // printf("\n%d: wall=%d  dist=%f raySin = %lf rayCos = %lf ray_angle = %lf wall_ind = %d,%d hitx = %lf player_pos = %lf,%lf player_angle = %lf skybox_x = %d\n", ray_cnt, wall,hitx, dist,raySin,rayCos, ray_angle,mapx,mapy,player.x,player.y,player.pa,skybox_pos); 
 	  draw_skybox(skybox_pos, ray_cnt,wall_pos.y);
 	  draw_texture(wall_pos,texture_pos,wall_height,texture);
 	}
 	ray_angle += rc_data.increment_angle;
   }
-  DrawFPS(0, 0);
+  DrawFPS(0,0);
   EndDrawing();
 }
 
 void player_input(){
-  double speed = player.mv_speed;
+  float speed = player.mv_speed;
   if(IsKeyDown(KEY_RIGHT_SHIFT) || IsKeyDown(KEY_LEFT_SHIFT)){
 	speed *= 1.5;
   }
   if(IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)){
 	speed *= 0.5;
   }
-  double paCos = cos(DEGREE_TO_RADIANS(player.pa)) * speed;
-  double paSin = sin(DEGREE_TO_RADIANS(player.pa)) * speed;
+  float paCos = cos(DEGREE_TO_RADIANS(player.pa)) * speed;
+  float paSin = sin(DEGREE_TO_RADIANS(player.pa)) * speed;
   if(IsKeyDown(KEY_W)){
-	double new_player_x = 	player.x + paCos;
-	double new_player_y = 	player.y + paSin;
+	float new_player_x = 	player.x + paCos;
+	float new_player_y = 	player.y + paSin;
 	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_S)){
-	double new_player_x = 	player.x - paCos;
-	double new_player_y = 	player.y - paSin;
+	float new_player_x = 	player.x - paCos;
+	float new_player_y = 	player.y - paSin;
 	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_A)){
-	double angle_in_radians = DEGREE_TO_RADIANS(player.pa);
-	double strfCos = cos( angle_in_radians - PI/2) * speed;
-	double strfSin = sin(angle_in_radians - PI/2) * speed;
-	double new_player_x = 	player.x + strfCos;
-	double new_player_y = 	player.y + strfSin;
+	float angle_in_radians = DEGREE_TO_RADIANS(player.pa);
+	float strfCos = cosf( angle_in_radians - PI/2) * speed;
+	float strfSin = sinf(angle_in_radians - PI/2) * speed;
+	float new_player_x = 	player.x + strfCos;
+	float new_player_y = 	player.y + strfSin;
 	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_D)){
-	double angle_in_radians = DEGREE_TO_RADIANS(player.pa);
-	double strfCos = cos(angle_in_radians + PI/2) * speed;
-	double strfSin = sin(angle_in_radians + PI/2) * speed;
-	double new_player_x = 	player.x + strfCos;
-	double new_player_y = 	player.y + strfSin;
+	float angle_in_radians = DEGREE_TO_RADIANS(player.pa);
+	float strfCos = cosf(angle_in_radians + PI/2) * speed;
+	float strfSin = sinf(angle_in_radians + PI/2) * speed;
+	float new_player_x = 	player.x + strfCos;
+	float new_player_y = 	player.y + strfSin;
 	if(!worldMap[(int)new_player_y][(int)new_player_x]){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
@@ -290,8 +271,10 @@ void player_input(){
 }
 
 void init_screen(){
+  SetConfigFlags(FLAG_FULLSCREEN_MODE);
   InitWindow(screen.width, screen.height, "Raycasting");
   DisableCursor();
+  
   /* SetTargetFPS(60); */
   project.width = screen.width / screen.proj_scale;
   project.height = screen.height / screen.proj_scale;
@@ -305,7 +288,7 @@ void load_textures(){
   skybox.height = img_skybox.height;
   skybox.width = img_skybox.width;
   skybox.contents = convert_image_to_colum_major(img_skybox);
-  skybox_y_inc = ((double)project.half_height / (double)skybox.height);
+  skybox_y_inc = ((float)project.half_height / (float)skybox.height);
   /* skybox.contents = calloc(skybox.width * skybox.height, sizeof(Color)); */
   /* for(int i = 0; i < skybox.width * skybox.height;i++){ */
   /* 	skybox.contents[i] = GRAY; */
@@ -316,13 +299,16 @@ void load_textures(){
   loaded_textures[0].height = test_text.height;
 }
 
+
 int main()
 {
   init_screen();
+ 
   load_textures();
   while(!WindowShouldClose()){
 	raycast();
 	player_input();
   }
+  CloseWindow();
 }
 
