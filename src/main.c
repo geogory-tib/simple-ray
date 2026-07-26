@@ -29,7 +29,15 @@ typedef struct{
   int height;
   Color *contents;
 }texture_t;
+typedef enum{
+  TYP_FLOOR = 0,
+  TYP_WALL
+}grid_type;
 
+typedef struct{
+  grid_type type;
+  int texture_id;
+}cell_t;
 typedef struct{
   float x;
   float y;
@@ -58,25 +66,47 @@ struct{
   int half_height;
   int half_width;
 }project = {0};
-texture_t skybox = {.width = 64, .height = 64};
+Texture skybox;
 float skybox_y_inc;
-texture_t floor_text = {0};
-texture_t loaded_textures[100];
+Texture floor_text;
+Texture loaded_textures[100];
 
 
 
-unsigned int worldMap[10][10] =
+/* unsigned int worldMap[10][10] = */
+/* { */
+/*     {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001}, */
+/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0,   0,   1001,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0, 0 ,    0,  0,  0,0,  0,    1001}, */
+/*     {1001,   0,   0,   0,  0,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0,   0,   1001,   0,   0,   0,   0,1001}, */
+/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
+/*     {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001} */
+/* }; */
+cell_t worldMap[10][10] =
 {
-    {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,   0,   0,   0,   1001,   0,   0,   0,   0,1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,   0,   0, 0 ,    1001,  0,  0,0,  0,    1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001},
-    {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001}
+    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,2},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,2},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }
 };
 
 
@@ -84,56 +114,45 @@ unsigned int worldMap[10][10] =
 // TODO -- FIX HOW FUCKING SLOW THE SKYBOX RENDERING IS - MAKE THIS SHIT WORK AND WORK GOOD!
 
 
-void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture){
-  float y_inc = (wall_height * 2) / texture.height;
-  int col = (texture_x * texture.height);
-  for(int i = 0;i < texture.height;i++){
-	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]);
-	Vector2 line_start = {.x = wall_pos.x, .y = wall_pos.y};
-	Vector2 line_end = {.x = wall_pos.x, .y = wall_pos.y += y_inc};
-	DrawLineV(line_start, line_end,texture.contents[col + i]);
-  }
-}
-void draw_skybox(unsigned int skybox_pos,int x,int wall_y){
-  float y = 0;
-  int row = skybox_pos * skybox.width;
-  skybox_pos = skybox_pos & skybox.width - 1;
-  for(int i = 0;i < skybox.height && y < wall_y;i++){
-	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]);
-	Vector2 line_start = {.x = x, .y = y};
-	Vector2 line_end = {.x = x, .y = y += skybox_y_inc};
-	DrawLineV(line_start, line_end,skybox.contents[row + i]);
-  }
-}
-Color *convert_image_to_colum_major(Image img){
-  Color *ret = malloc((img.height * img.width) * sizeof(Color));
-  Color *contents = LoadImageColors(img);
-  int x = 0;
-  int y = 0;
-  for(;x < img.width;){
-	ret[(x * img.height) + y] = contents[y * img.width + x];
-	y++;
-	if(y > img.height){
-	  x++;
-	  y = 0;
-	}
-	
-  }
-  UnloadImage(img);
-  // UnloadImageColors(contents);
-  return ret;
+void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,Texture texture){
+  /* float y_inc = (wall_height * 2) / texture.height; */
+  /* int col = (texture_x * texture.height); */
+  /* for(int i = 0;i < texture.height;i++){ */
+  /* 	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]); */
+  /* 	Vector2 line_start = {.x = wall_pos.x, .y = wall_pos.y}; */
+  /* 	Vector2 line_end = {.x = wall_pos.x, .y = wall_pos.y += y_inc}; */
+  /* 	DrawLineV(line_start, line_end,texture.contents[col + i]); */
+  /* } */
+  Rectangle texture_rect = {.x = texture_x,.y = 0,.height = texture.height,.width = 1};
+  Rectangle screen_rect = {.x = wall_pos.x,.y = wall_pos.y,.height = wall_height * 2,.width = 1};
+  DrawTexturePro(texture, texture_rect, screen_rect, (Vector2){0.0f,0.0f},0.0f, WHITE);
 }
 
-void raycast(){
-  float ray_angle = player.pa - player.half_fov;
-  BeginDrawing();
+// just use the gpu to draw this lol. DrawTexturePro
+void draw_skybox(unsigned int skybox_pos){
+  /* float y = 0; */
+  /* int row = skybox_pos * skybox.width; */
+  /* skybox_pos = skybox_pos & skybox.width - 1; */
+  /* for(int i = 0;i < skybox.height && y < wall_y;i++){ */
+  /* 	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]); */
+  /* 	Vector2 line_start = {.x = x, .y = y}; */
+  /* 	Vector2 line_end = {.x = x, .y = y += skybox_y_inc}; */
+  /* 	DrawLineV(line_start, line_end,skybox.contents[row + i]); */
+  // }
+  Rectangle skybox_rect = {.x = skybox_pos,.y = 0,.width = skybox.width, .height = skybox.height};
+  Rectangle screen_rect = {.x = 0,.y = 0,.height = project.half_height,.width = project.width};
+  DrawTexturePro(skybox, skybox_rect, screen_rect, (Vector2){0.0}, 0.0f, WHITE);
+}
+void floor_cast(float ray_angle){
+  
+}
+void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float sinDelta){
+ 
   ClearBackground(GRAY);
   for(int ray_cnt = 0;ray_cnt < project.width;ray_cnt++){
    	/* float rayCos = fast_cosine(ray_angle) /\* / rc_data.prec *\/; */
 	/* float raySin = fast_sin(ray_angle) /\* / rc_data.prec *\/; */
-	float rayCos /* = cosf(DEGREE_TO_RADIANS(ray_angle)); */;
-	float raySin /*= sinf(DEGREE_TO_RADIANS(ray_angle)); */;
-	sincosf(DEGREE_TO_RADIANS(ray_angle),&raySin,&rayCos);
+
 	int wall = 0;
 	float delta_dist_x = fabs(1 / rayCos);
 	float delta_dist_y = fabs(1/ raySin);
@@ -168,8 +187,9 @@ void raycast(){
 		mapy += step_y;
 		side  = 1;
 	  }
-	  wall = worldMap[mapy][mapx];
+	  wall = worldMap[mapx][mapy].type;
 	}
+	cell_t wall_cell = worldMap[mapx][mapy];
 	float dist;
 	float hitx;
 	if(side == 0){
@@ -179,30 +199,48 @@ void raycast(){
 	else{
 	  dist = (side_dist_y - delta_dist_y);
 	  hitx = player.x + (dist * rayCos);
-	  hitx -= floor(hitx);
 	}
+	hitx -= floorf(hitx);
 
 	float wall_height = (float)project.half_height / dist;
 	//Color color_map[6] = {GREEN,RED,BLUE,WHITE,RAYWHITE,PURPLE};
 	Vector2 wall_pos = {.x = ray_cnt, .y = project.half_height - wall_height};
-
-	if(wall != 1){
-	  int texture_id = wall & ~ (TEXTURE_WALL); texture_id--;
-	  texture_t texture = loaded_textures[texture_id];
-	  int texture_pos = ((int)(texture.width * hitx) & (texture.width - 1));
-	  unsigned int skybox_pos =(((unsigned int)(ray_angle / 360 * skybox.width) % skybox.width));
-	  if(skybox_pos < 0){
-		skybox_pos = 0;
-	  }
-	  // printf("\n%d: wall=%d  dist=%f raySin = %lf rayCos = %lf ray_angle = %lf wall_ind = %d,%d hitx = %lf player_pos = %lf,%lf player_angle = %lf skybox_x = %d\n", ray_cnt, wall,hitx, dist,raySin,rayCos, ray_angle,mapx,mapy,player.x,player.y,player.pa,skybox_pos); 
-	  draw_skybox(skybox_pos, ray_cnt,wall_pos.y);
-	  draw_texture(wall_pos,texture_pos,wall_height,texture);
-	}
+	Texture texture = loaded_textures[wall_cell.texture_id];
+	int texture_pos = ((int)(texture.width * hitx) & (texture.width - 1));	
+	// printf("\n%d: wall=%d  dist=%f raySin = %lf rayCos = %lf ray_angle = %lf wall_ind = %d,%d hitx = %lf player_pos = %lf,%lf player_angle = %lf skybox_x = %d\n", ray_cnt, wall,hitx, dist,raySin,rayCos, ray_angle,mapx,mapy,player.x,player.y,player.pa,skybox_pos); 
+	draw_texture(wall_pos,texture_pos,wall_height,texture);
+	
+	rayCos =  rayCos * cosDelta - raySin * sinDelta;
+	raySin = raySin * cosDelta +  rayCos  * sinDelta;
 	ray_angle += rc_data.increment_angle;
   }
+  
+  
+}
+void render(){
+  float ray_angle = player.pa - player.half_fov;
+  float rayCos /* = cosf(DEGREE_TO_RADIANS(ray_angle)); */;
+  float raySin /*= sinf(DEGREE_TO_RADIANS(ray_angle)); */;
+  sincosf(DEGREE_TO_RADIANS(ray_angle),&raySin,&rayCos);
+  float rot_delta = DEGREE_TO_RADIANS(rc_data.increment_angle);
+  float sinDelta;
+  float cosDelta;
+  sincosf(DEGREE_TO_RADIANS(rc_data.increment_angle),&sinDelta,&cosDelta);
+  unsigned int skybox_pos = (((unsigned int)(ray_angle / 360 * skybox.width) % skybox.width));
+  if(skybox_pos < 0){
+	skybox_pos = 0;
+  }
+  unsigned int floor_pos = ((unsigned int)(ray_angle / 360 * floor_text.width) % floor_text.width);
+  if(floor_pos < 0){
+	floor_pos = 0;
+  }
+  BeginDrawing();
+  draw_skybox(skybox_pos);
+  raycast(ray_angle, raySin, rayCos,cosDelta,sinDelta);
   DrawFPS(0,0);
   EndDrawing();
 }
+
 
 void player_input(){
   float speed = player.mv_speed;
@@ -217,7 +255,7 @@ void player_input(){
   if(IsKeyDown(KEY_W)){
 	float new_player_x = 	player.x + paCos;
 	float new_player_y = 	player.y + paSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
+	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
@@ -225,7 +263,7 @@ void player_input(){
   if(IsKeyDown(KEY_S)){
 	float new_player_x = 	player.x - paCos;
 	float new_player_y = 	player.y - paSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
+	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
@@ -236,7 +274,7 @@ void player_input(){
 	float strfSin = sinf(angle_in_radians - PI/2) * speed;
 	float new_player_x = 	player.x + strfCos;
 	float new_player_y = 	player.y + strfSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x] != 0){
+	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
@@ -247,7 +285,7 @@ void player_input(){
 	float strfSin = sinf(angle_in_radians + PI/2) * speed;
 	float new_player_x = 	player.x + strfCos;
 	float new_player_y = 	player.y + strfSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x]){
+	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
 	  player.x = new_player_x;
 	  player.y = new_player_y;
 	}
@@ -271,11 +309,10 @@ void player_input(){
 }
 
 void init_screen(){
-  SetConfigFlags(FLAG_FULLSCREEN_MODE);
+  // SetConfigFlags(FLAG_FULLSCREEN_MODE);
   InitWindow(screen.width, screen.height, "Raycasting");
   DisableCursor();
-  
-  /* SetTargetFPS(60); */
+  SetTargetFPS(60);
   project.width = screen.width / screen.proj_scale;
   project.height = screen.height / screen.proj_scale;
   project.half_width = project.width / 2;
@@ -284,19 +321,23 @@ void init_screen(){
 }
 
 void load_textures(){
-  Image img_skybox = LoadImage("betterbox.png");
-  skybox.height = img_skybox.height;
-  skybox.width = img_skybox.width;
-  skybox.contents = convert_image_to_colum_major(img_skybox);
-  skybox_y_inc = ((float)project.half_height / (float)skybox.height);
+  /* Image img_skybox = LoadImage("betterbox.png"); */
+  /* skybox.height = img_skybox.height; */
+  /* skybox.width = img_skybox.width; */
+  /* skybox.contents = convert_image_to_colum_major(img_skybox); */
+  /* skybox_y_inc = ((float)project.half_height / (float)skybox.height); */
   /* skybox.contents = calloc(skybox.width * skybox.height, sizeof(Color)); */
   /* for(int i = 0; i < skybox.width * skybox.height;i++){ */
   /* 	skybox.contents[i] = GRAY; */
   /* } */
-  Image test_text = LoadImage("brick128.png");
-  loaded_textures[0].contents = convert_image_to_colum_major(test_text);
-  loaded_textures[0].width = test_text.width;
-  loaded_textures[0].height = test_text.height;
+  /* Image test_text = LoadImage("brick128.png"); */
+  /* loaded_textures[0].contents = convert_image_to_colum_major(test_text); */
+  /* loaded_textures[0].width = test_text.width; */
+  /* loaded_textures[0].height = test_text.height; */
+  skybox = LoadTexture("skyboxtest.png");
+  loaded_textures[0] = LoadTexture("brick128.png");
+  floor_text =  LoadTexture("grass_text.png");
+  SetTextureFilter(loaded_textures[0], TEXTURE_FILTER_POINT);
 }
 
 
@@ -306,7 +347,7 @@ int main()
  
   load_textures();
   while(!WindowShouldClose()){
-	raycast();
+	render();
 	player_input();
   }
   CloseWindow();
