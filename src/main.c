@@ -116,21 +116,40 @@ cell_t worldMap[10][10] =
 
 Image FrameBuffer;
 Texture FrameText;
+Color *convert_image_to_colum_major(Image img){
+  Color *ret = malloc((img.height * img.width) * sizeof(Color));
+  Color *contents = LoadImageColors(img);
+  int x = 0;
+  int y = 0;
+  for(;x < img.width;){
+	ret[(x * img.height) + y] = contents[y * img.width + x];
+	y++;
+	if(y > img.height){
+	  x++;
+	  y = 0;
+	}
+	
+  }
+  UnloadImageColors(contents);
+  return ret;
+}
 texture_t load_engine_texture(char *filename){
   texture_t ret = {0};
   Image img = LoadImage(filename);
-  ret.contents  = LoadImageColors(img);
+  ret.contents  =  convert_image_to_colum_major(img);
   ret.width = img.width;
   ret.height = img.height;
+  UnloadImage(img);
   return ret;
 }
 void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture){
   float y_inc = (wall_height * 2) / texture.height;
+  int col = (texture_x * texture.height);
   for(int i = 0;i < texture.height;i++){
 	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]);
 	Vector2 line_start = {.x = wall_pos.x, .y = wall_pos.y};
 	Vector2 line_end = {.x = wall_pos.x, .y = wall_pos.y += y_inc};
-	ImageDrawLineV(&FrameBuffer,line_start, line_end,texture.contents[i * texture.width + texture_x ]);
+	ImageDrawLineV(&FrameBuffer,line_start, line_end,texture.contents[col + i]);
   }
   /* Rectangle texture_rect = {.x = texture_x,.y = 0,.height = texture.height,.width = 1}; */
   /* Rectangle screen_rect = {.x = wall_pos.x,.y = wall_pos.y,.height = wall_height * 2,.width = 1}; */
@@ -167,15 +186,13 @@ void draw_floor(int x,float wall_height,float rayCos,float raySin){
 	//printf("dist = %f tilex = %f tiley = %f\n",dist,tilex,tiley);
 	int text_x = (int)(tilex * floor_text.width) & (floor_text.width - 1);
 	int text_y = (int)(tiley * floor_text.height) & (floor_text.height - 1);
-	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},floor_text.contents[text_y * floor_text.width + text_x]);
+	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},floor_text.contents[text_x * floor_text.height + text_y]);
 	y++;
   }
 }
 
 void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float sinDelta){
   for(int ray_cnt = 0;ray_cnt < project.width;ray_cnt++){
-   	/* float rayCos = fast_cosine(ray_angle) /\* / rc_data.prec *\/; */
-	/* float raySin = fast_sin(ray_angle) /\* / rc_data.prec *\/; */
 	int wall = 0;
 	float delta_dist_x = fabs(1 / rayCos);
 	float delta_dist_y = fabs(1/ raySin);
@@ -244,7 +261,8 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 
 
 void render(){
-  ImageClearBackground(&FrameBuffer, BLANK);
+  // clear horizon
+  ImageDrawRectangle(&FrameBuffer, 0, 0, project.width, project.half_height, BLANK);
   float ray_angle = player.pa - player.half_fov;
   float rayCos /* = cosf(DEGREE_TO_RADIANS(ray_angle)); */;
   float raySin /*= sinf(DEGREE_TO_RADIANS(ray_angle)); */;
@@ -338,7 +356,7 @@ void init_screen(){
   // SetConfigFlags(FLAG_FULLSCREEN_MODE);
   InitWindow(screen.width, screen.height, "Raycasting");
   DisableCursor();
-  SetTargetFPS(60);
+  //SetTargetFPS(60);
   project.width = screen.width / screen.proj_scale;
   project.height = screen.height / screen.proj_scale;
   project.half_width = project.width / 2;
