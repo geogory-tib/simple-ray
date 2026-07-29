@@ -21,7 +21,7 @@ g++ *.cpp -lSDL
 #define DEFAULT_PROJECTION_SCALE 1
 #define mapWidth 10
 #define mapHeight 10
-#define DEFAULT_MOVE_SPEED  0.1450 / 4
+#define DEFAULT_MOVE_SPEED  2.5
 #define DEFAULT_MOUSE_SENS 0.50
 #define TEXTURE_WALL 1000
 typedef struct{
@@ -29,11 +29,20 @@ typedef struct{
   int height;
   Color *contents;
 }texture_t;
+typedef struct{
+  Texture text;
+  bool loaded;
+}gpu_loaded_texture;
 typedef enum{
   TYP_FLOOR = 0,
   TYP_WALL
 }grid_type;
 
+typedef struct{
+  texture_t spr_txt;
+  float x;
+  float y;
+}sprite_t;
 typedef struct{
   grid_type type;
   int texture_id;
@@ -67,11 +76,14 @@ struct{
   int half_width;
 }project = {0};
 Texture skybox;
+bool enable_skybox = false;
 float skybox_y_inc;
-texture_t  floor_text = {0};
+texture_t  ceiling_text = {0};
 texture_t loaded_textures[100];
+gpu_loaded_texture gpu_loaded_textures[100];
 
 
+// TODO -- WORK ON SPRITE RENDERING!
 
 /* unsigned int worldMap[10][10] = */
 /* { */
@@ -87,30 +99,73 @@ texture_t loaded_textures[100];
 /*     {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001} */
 /* }; */
 
-cell_t worldMap[10][10] =
+/* cell_t worldMap[10][10] = */
+/* { */
+/*     { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
+
+/*     { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} } */
+/* }; */
+
+cell_t worldMap[20][20] =
 {
-    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }
 };
 
-
+sprite_t sprites[10];
 
 // TODO -- This shit Isn't working some I am just going to make a buffer than just write that to the screen;
 
@@ -142,34 +197,51 @@ texture_t load_engine_texture(char *filename){
   UnloadImage(img);
   return ret;
 }
+// using this because I am going to attempt to off load more to the gpu to see if that will be faster not sure if it will be
+void draw_wall_strip(Vector2 wall_pos,int texture_x,double wall_height,int texture_id){
+  // have to do this due to the way I have to software render some textures I am too dumb to figure out how to do this on gpu
+  if(!gpu_loaded_textures[texture_id].loaded){
+	texture_t engine_text = loaded_textures[texture_id];
+	Image texture_image = {.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,.data = engine_text.contents,.width = engine_text.width,.height = engine_text.height,.mipmaps = 1 };
+	gpu_loaded_textures[texture_id].text = LoadTextureFromImage(texture_image);
+	gpu_loaded_textures[texture_id].loaded = true;
+  }
+  Texture texture = gpu_loaded_textures[texture_id].text;
+  Rectangle texture_rect = {.x = texture_x,.y = 0,.height = texture.height,.width = 1};
+  Rectangle screen_rect = {.x = wall_pos.x,.y = wall_pos.y,.height = wall_height * 2,.width = 1};
+  DrawTexturePro(texture, texture_rect, screen_rect, (Vector2){0.0f,0.0f},0.0f, WHITE);
+}
 void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture){
   float y_inc = (wall_height * 2) / texture.height;
   int col = (texture_x * texture.height);
   for(int i = 0;i < texture.height;i++){
-	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]);
 	Vector2 line_start = {.x = wall_pos.x, .y = wall_pos.y};
 	Vector2 line_end = {.x = wall_pos.x, .y = wall_pos.y += y_inc};
 	ImageDrawLineV(&FrameBuffer,line_start, line_end,texture.contents[col + i]);
   }
-  /* Rectangle texture_rect = {.x = texture_x,.y = 0,.height = texture.height,.width = 1}; */
-  /* Rectangle screen_rect = {.x = wall_pos.x,.y = wall_pos.y,.height = wall_height * 2,.width = 1}; */
-  /* DrawTexturePro(texture, texture_rect, screen_rect, (Vector2){0.0f,0.0f},0.0f, WHITE); */
 }
 
 // just use the gpu to draw this lol. DrawTexturePro
 void draw_skybox(unsigned int skybox_pos){
-  /* float y = 0; */
-  /* int row = skybox_pos * skybox.width; */
-  /* skybox_pos = skybox_pos & skybox.width - 1; */
-  /* for(int i = 0;i < skybox.height && y < wall_y;i++){ */
-  /* 	//	DrawPixel(start.x, y,texture.contents[(texture_x * texture.width) + i]); */
-  /* 	Vector2 line_start = {.x = x, .y = y}; */
-  /* 	Vector2 line_end = {.x = x, .y = y += skybox_y_inc}; */
-  /* 	DrawLineV(line_start, line_end,skybox.contents[row + i]); */
-  // }
   Rectangle skybox_rect = {.x = skybox_pos,.y = 0,.width = skybox.width, .height = skybox.height};
-  Rectangle screen_rect = {.x = 0,.y = 0,.height = project.half_height,.width = project.width};
+  Rectangle screen_rect = {.x = 0,.y = 0,.height = screen.half_height,.width = screen.width};
   DrawTexturePro(skybox, skybox_rect, screen_rect, (Vector2){0.0}, 0.0f, WHITE);
+}
+
+void draw_ceiling(int x,float wall_height,float rayCos,float raySin){
+  float start = 0;
+  float y = start;
+  for(;y < project.height - wall_height;){
+	float dist = project.height / (project.height - 2 * y);
+	float tilex = dist * rayCos;
+	float tiley = dist * raySin;
+	tilex += player.x;
+	tiley += player.y;
+	int text_x = (int)(tilex * ceiling_text.width) & (ceiling_text.width - 1);
+	int text_y = (int)(tiley * ceiling_text.height) & (ceiling_text.height - 1);
+	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},ceiling_text.contents[text_x * ceiling_text.height + text_y]);
+	y++;
+  }
 }
 
 void draw_floor(int x,float wall_height,float rayCos,float raySin){
@@ -182,8 +254,7 @@ void draw_floor(int x,float wall_height,float rayCos,float raySin){
 	tilex += player.x;
 	tiley += player.y;
 	cell_t floor_cell = worldMap[(int)tiley][(int)tilex];
-	floor_text = loaded_textures[floor_cell.texture_id];
-	//printf("dist = %f tilex = %f tiley = %f\n",dist,tilex,tiley);
+	texture_t floor_text = loaded_textures[floor_cell.texture_id];
 	int text_x = (int)(tilex * floor_text.width) & (floor_text.width - 1);
 	int text_y = (int)(tiley * floor_text.height) & (floor_text.height - 1);
 	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},floor_text.contents[text_x * floor_text.height + text_y]);
@@ -241,14 +312,15 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 	  hitx = player.x + (dist * rayCos);
 	}
 	hitx -= floorf(hitx);
-
 	float wall_height = (float)project.half_height / dist;
-	//Color color_map[6] = {GREEN,RED,BLUE,WHITE,RAYWHITE,PURPLE};
 	Vector2 wall_pos = {.x = ray_cnt, .y = project.half_height - wall_height};
 	texture_t texture = loaded_textures[wall_cell.texture_id];
 	int texture_pos = ((int)(texture.width * hitx) & (texture.width - 1));
-	// printf("\n%d: wall=%d  dist=%f raySin = %lf rayCos = %lf ray_angle = %lf wall_ind = %d,%d hitx = %lf player_pos = %lf,%lf player_angle = %lf skybox_x = %d\n", ray_cnt, wall,hitx, dist,raySin,rayCos, ray_angle,mapx,mapy,player.x,player.y,player.pa,skybox_pos);
+	if(!enable_skybox){
+	  draw_ceiling(ray_cnt, wall_height, rayCos, raySin);
+	}
 	draw_texture(wall_pos,texture_pos,wall_height,texture);
+	//draw_wall_strip(wall_pos, texture_pos, wall_height,wall_cell.texture_id);
 	draw_floor(ray_cnt, wall_height, rayCos, raySin);
 	float new_cos = rayCos * cosDelta - raySin * sinDelta;
 	raySin = raySin * cosDelta +  rayCos  * sinDelta;
@@ -261,8 +333,11 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 
 
 void render(){
-  // clear horizon
-  ImageDrawRectangle(&FrameBuffer, 0, 0, project.width, project.half_height, BLANK);
+  // clear horizon if using skybox
+  if(enable_skybox){
+	//	ImageDrawRectangle(&FrameBuffer, 0, 0, project.width, project.half_height, BLANK);
+	ImageClearBackground(&FrameBuffer, BLANK);
+  }
   float ray_angle = player.pa - player.half_fov;
   float rayCos /* = cosf(DEGREE_TO_RADIANS(ray_angle)); */;
   float raySin /*= sinf(DEGREE_TO_RADIANS(ray_angle)); */;
@@ -276,18 +351,23 @@ void render(){
 	skybox_pos = 0;
   }
   BeginDrawing();
-  draw_skybox(skybox_pos);
+  if(enable_skybox){
+	draw_skybox(skybox_pos);
+  }
   //floor_cast();
   raycast(ray_angle, raySin, rayCos,cosDelta,sinDelta);
   UpdateTexture(FrameText, FrameBuffer.data);
-  DrawTexture(FrameText, 0, 0, WHITE);
+  // DrawTexture(FrameText, 0, 0, WHITE);
+  Rectangle buffer_rect = {.x = 0,.y = 0,.width = FrameText.width,.height = FrameText.height};
+  Rectangle screen_rect = {.x = 0,.y = 0,.width = screen.width,screen.height};
+  DrawTexturePro(FrameText, buffer_rect, screen_rect, (Vector2){0.0f,0.0f}, 0.0f, WHITE);
   DrawFPS(0,0);
   EndDrawing();
 }
 
 
 void player_input(){
-  float speed = player.mv_speed;
+  float speed = player.mv_speed * GetFrameTime();
   if(IsKeyDown(KEY_RIGHT_SHIFT) || IsKeyDown(KEY_LEFT_SHIFT)){
 	speed *= 1.5;
   }
@@ -340,6 +420,9 @@ void player_input(){
   if(IsKeyDown(KEY_F2)){
 	DisableCursor();
   }
+  if(IsKeyPressed(KEY_F3)){
+	enable_skybox  = !enable_skybox;
+  }
   Vector2 mouse_delta = GetMouseDelta();
   if(mouse_delta.x != 0){
 	player.pa += mouse_delta.x * player.mse_sens;
@@ -367,10 +450,14 @@ void init_screen(){
 }
 
 void load_textures(){
-  skybox = LoadTexture("skyboxtest.png");
+  skybox = LoadTexture("nightsky.png");
+  enable_skybox = true;
   loaded_textures[0] = load_engine_texture("brick128.png");
   loaded_textures[1] = load_engine_texture("grass128x128.png");
-  floor_text = load_engine_texture("bricks64.png");
+  ceiling_text = load_engine_texture("brick128.png");
+  sprites[0].spr_txt = load_engine_texture("tree-1.png");
+  sprites[0].x = 1.0f;
+  sprites[0].y = 1.0f;
 }
 
 
