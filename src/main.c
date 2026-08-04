@@ -42,6 +42,9 @@ typedef struct{
   texture_t spr_txt;
   float x;
   float y;
+  float z;
+  float wrld_width;
+  float wrld_height;
 }sprite_t;
 typedef struct{
   grid_type type;
@@ -56,7 +59,7 @@ typedef struct{
   float mv_speed;
   float mse_sens;
 }player_t;
-player_t player = {2.0,2.0,90,45,90.0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
+player_t player = {1.5,1.5,90,45,0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
 struct{
   float increment_angle;
   float prec;
@@ -166,6 +169,8 @@ cell_t worldMap[20][20] =
 };
 
 sprite_t sprites[10];
+// used to map the depth for each col of the screen will just be allocated to screen_width
+float *zbuffer;
 
 // TODO -- This shit Isn't working some I am just going to make a buffer than just write that to the screen;
 
@@ -198,6 +203,8 @@ texture_t load_engine_texture(char *filename){
   return ret;
 }
 // using this because I am going to attempt to off load more to the gpu to see if that will be faster not sure if it will be
+// after thinking about it, it will honestly end up being the same amount of work, I will still have to manually draw pixels strip
+// by strip with this, I can't even offload the wall drawing purely to the CP
 void draw_wall_strip(Vector2 wall_pos,int texture_x,double wall_height,int texture_id){
   // have to do this due to the way I have to software render some textures I am too dumb to figure out how to do this on gpu
   if(!gpu_loaded_textures[texture_id].loaded){
@@ -300,7 +307,7 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 	  }
 	  wall = worldMap[mapy][mapx].type;
 	}
-	cell_t wall_cell = worldMap[mapx][mapy];
+	cell_t wall_cell = worldMap[mapy][mapx];
 	float dist;
 	float hitx;
 	if(side == 0){
@@ -326,11 +333,119 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 	raySin = raySin * cosDelta +  rayCos  * sinDelta;
 	rayCos = new_cos;
 	ray_angle += rc_data.increment_angle;
+	zbuffer[ray_cnt] = dist;
   }
   
-  
 }
+// for now it's just one sprite
+/* void draw_sprites(){ */
+/*   sprite_t sprite = sprites[0]; */
+/*   float dx = sprite.x - player.x; */
+/*   float dy = sprite.y - player.y; */
+/*   float dz = sprite.z; */
+/*   float pa_radians = DEGREE_TO_RADIANS(player.pa); */
+/*   float pa_sin = sinf(pa_radians); */
+/*   float pa_cos = cosf(pa_radians); */
+/*   // rotated around players angle */
+/*   float a=dy*pa_cos+dx*pa_sin; */
+/*   float b=dx*pa_cos-dy*pa_sin; */
+/*   // 3d projection onto the screen */
+/*   float screen_x = (a /b)+(project.half_width); */
+/*   float screen_y = (dz/ b)+(project.half_height); */
+/*   #ifdef DEBUG */
+/*   printf("dx = %f, dy = %f   a = %f b = %f, screen_y = %f, screen_x %f\n",dx,dy,a,b,screen_y,screen_x); */
+/*   #endif */
+/*   if(b < 0) */
+/* 	return; */
+/*   ImageDrawRectangleV(&FrameBuffer, (Vector2){.x = screen_x,.y = screen_y}, (Vector2){.x = 100,.y = 100}, YELLOW); */
+/* } */
 
+void draw_sprites(void)
+{
+    sprite_t sprite = sprites[0];
+
+    // Sprite position relative to player.
+    float dx = sprite.x - player.x;
+    float dy = sprite.y - player.y;
+
+    float angle = DEGREE_TO_RADIANS(player.pa);
+    float pa_sin = sinf(angle);
+    float pa_cos = cosf(angle);
+
+    // Transform world position into camera space.
+    float depth =  dx * pa_cos + dy * pa_sin;
+    float side  = -dx * pa_sin + dy * pa_cos;
+
+    // Behind the camera or too close to project safely.
+    /* if (depth <= 0.001f) { */
+    /*     return; */
+    /* } */
+
+    // Outside horizontal FOV.
+    if (fabsf(side) > depth) {
+        return;
+    }
+
+    float focal_length =
+        (float)project.half_width;
+
+    // Horizontal screen coordinate of the sprite's center.
+    float screen_x =
+        (float)project.half_width +
+        (side / depth) * focal_length;
+
+    /*
+     * Example vertical setup:
+     *
+     * z = 0 is the floor.
+     * Camera is 0.5 world units above the floor.
+     * sprite.z is the sprite's floor/base position.
+     */
+    const float camera_z = 0.5f;
+    const float sprite_world_width = 0.5f;
+    const float sprite_world_height = 0.5f;
+
+    float sprite_bottom_z = sprite.z;
+    float sprite_top_z = sprite.z + sprite.wrld_height;
+
+  
+    float screen_bottom =(float)project.half_height -((sprite_bottom_z - camera_z) / depth) * focal_length;
+
+    float screen_top = (float)project.half_height -((sprite_top_z - camera_z) / depth) * focal_length;
+
+    float screen_width = (sprite.wrld_width / depth) * focal_length;
+
+    float screen_height = screen_bottom - screen_top;
+
+    // screen_x represents the center, while ImageDrawRectangleV receives
+    // a rectangle position and size. :contentReference[oaicite:1]{index=1}
+	float draw_start_x = screen_x - screen_width * 0.5f;
+	float draw_end_x = screen_x + screen_width;
+	float draw_start_y = screen_top;
+	float draw_end_y = screen_top + screen_height;
+	for(int strip = (int)draw_start_x;strip < draw_end_x;strip++){
+	  float u = (strip - draw_start_x)  / screen_width;
+	  int texture_x = u * sprite.spr_txt.width;
+	  if(texture_x >= sprite.spr_txt.width){
+		texture_x = sprite.spr_txt.width - 1;
+	  }
+	  int col = texture_x * sprite.spr_txt.height;
+	  if(strip < project.width && depth <= zbuffer[strip]){
+		for(int y = draw_start_y;y < draw_end_y;y++){
+		  float v =  (y - draw_start_y) / screen_height;
+		  int texture_y = v * sprite.spr_txt.height;
+		  if(texture_y >= sprite.spr_txt.height){
+				texture_y = sprite.spr_txt.height - 1;
+		  }
+		  if(sprite.spr_txt.contents[col + texture_y].a == 0){
+			continue;
+		  }
+		  ImageDrawPixel(&FrameBuffer,strip,y,sprite.spr_txt.contents[col + texture_y]);
+		}
+	  }
+	}
+    //ImageDrawRectangleV(&FrameBuffer, position, size, YELLOW);
+}
 
 void render(){
   // clear horizon if using skybox
@@ -356,6 +471,7 @@ void render(){
   }
   //floor_cast();
   raycast(ray_angle, raySin, rayCos,cosDelta,sinDelta);
+  draw_sprites();
   UpdateTexture(FrameText, FrameBuffer.data);
   // DrawTexture(FrameText, 0, 0, WHITE);
   Rectangle buffer_rect = {.x = 0,.y = 0,.width = FrameText.width,.height = FrameText.height};
@@ -447,6 +563,7 @@ void init_screen(){
   rc_data.increment_angle = player.fov / project.width;
   FrameBuffer = GenImageColor(project.width, project.height, BLANK);
   FrameText = LoadTextureFromImage(FrameBuffer);
+  zbuffer = calloc(project.width, sizeof(float));
 }
 
 void load_textures(){
@@ -455,9 +572,12 @@ void load_textures(){
   loaded_textures[0] = load_engine_texture("brick128.png");
   loaded_textures[1] = load_engine_texture("grass128x128.png");
   ceiling_text = load_engine_texture("brick128.png");
-  sprites[0].spr_txt = load_engine_texture("tree-1.png");
-  sprites[0].x = 1.0f;
-  sprites[0].y = 1.0f;
+  sprites[0].spr_txt = load_engine_texture("tree2.png");
+  sprites[0].x = 2.5f;
+  sprites[0].y = 1.5f;
+  sprites[0].z = -0.1f;
+  sprites[0].wrld_height = 1.0f;
+  sprites[0].wrld_width = 1.0f;
 }
 
 
@@ -469,6 +589,10 @@ int main()
   while(!WindowShouldClose()){
 	render();
 	player_input();
+#ifdef DEBUG
+	printf("player x = %f player y = %f, player.pa = %f\n\r",player.x,player.y,player.pa);
+	printf("sprite x = %f sprite y = %f sprite_z = %f\n",sprites[0].x,sprites[0].y,sprites[0].z);
+#endif
   }
   CloseWindow();
 }
