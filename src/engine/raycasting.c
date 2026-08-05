@@ -7,15 +7,6 @@
 #include <math.h>
 const float  PI_DIV_180 = PI / 180.0; 
 #define DEGREE_TO_RADIANS(X)(X * PI_DIV_180)
-
-
-/*
-g++ *.cpp -lSDL -O3 -W -Wall -ansi -pedantic
-g++ *.cpp -lSDL
-*/
-
-//place the example code below here:
-
 #define DEFAULT_SCREEN_WIDTH 1280
 #define DEFAULT_SCREEN_HEIGHT 720
 #define DEFAULT_PROJECTION_SCALE 1
@@ -24,6 +15,13 @@ g++ *.cpp -lSDL
 #define DEFAULT_MOVE_SPEED  2.5
 #define DEFAULT_MOUSE_SENS 0.50
 #define TEXTURE_WALL 1000
+#define MIN_BRIGHTNESS 0.10f
+#define MAX_BRIGHTNESS 0.70f
+/*
+  Raycasting engine template -- this can be modified for whatever use I need.
+  I plan on making this a library or something I can plop in and just use maybe.
+  I am not sure on how to do that exactly but I will find a way.
+*/
 typedef struct{
   int width;
   int height;
@@ -37,7 +35,6 @@ typedef enum{
   TYP_FLOOR = 0,
   TYP_WALL
 }grid_type;
-
 typedef struct{
   texture_t spr_txt;
   float x;
@@ -51,15 +48,14 @@ typedef struct{
   int texture_id;
 }cell_t;
 typedef struct{
-  float x;
-  float y;
+  Vector3 pos;
   float fov;
   float half_fov;
   float pa;
   float mv_speed;
   float mse_sens;
 }player_t;
-player_t player = {1.5,1.5,90,45,0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
+player_t player = {(Vector3){.x = 1.5,1.5,0.5},90,45,0,DEFAULT_MOVE_SPEED,DEFAULT_MOUSE_SENS};
 struct{
   float increment_angle;
   float prec;
@@ -85,65 +81,27 @@ texture_t  ceiling_text = {0};
 texture_t loaded_textures[100];
 gpu_loaded_texture gpu_loaded_textures[100];
 
-
-// TODO -- WORK ON SPRITE RENDERING!
-
-/* unsigned int worldMap[10][10] = */
-/* { */
-/*     {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001}, */
-/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0,   0,   1001,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0, 0 ,    0,  0,  0,0,  0,    1001}, */
-/*     {1001,   0,   0,   0,  0,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0,   0,   1001,   0,   0,   0,   0,1001}, */
-/*     {1001,   0,   0,   0,   0,   0,   0,   0,   0,1001}, */
-/*     {1001,1001,1001,1001,1001,1001,1001,1001,1001,1001} */
-/* }; */
-
-/* cell_t worldMap[10][10] = */
-/* { */
-/*     { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_FLOOR,0},{TYP_WALL,0} }, */
-
-/*     { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} } */
-/* }; */
+float *brightness_lookup_table;
 
 cell_t worldMap[20][20] =
 {
-    { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} },
+    { {TYP_WALL,1},{TYP_WALL,1},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
-
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
-
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
-
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
-
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+    { {TYP_WALL,1},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_WALL,0} },
 
     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+
+    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
@@ -163,19 +121,35 @@ cell_t worldMap[20][20] =
 
     { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
 
-    { {TYP_WALL,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_WALL,0} },
+    { {TYP_WALL,0},{TYP_FLOOR,0},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,1},{TYP_FLOOR,0},{TYP_WALL,0} },
 
     { {TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0},{TYP_WALL,0} }
 };
 
+
+struct{
+  cell_t *data;
+  size_t height;
+  size_t width;
+}map_data = {&worldMap[0][0],20,20};
+
 sprite_t sprites[10];
-// used to map the depth for each col of the screen will just be allocated to screen_width
+
 float *zbuffer;
 
 // TODO -- This shit Isn't working some I am just going to make a buffer than just write that to the screen;
-
 Image FrameBuffer;
 Texture FrameText;
+float clampf(float val,float min,float max){
+  if(val < min){
+	return min;
+  }
+  if(val > max){
+	return max;
+  }
+  return val;
+}
+
 Color *convert_image_to_colum_major(Image img){
   Color *ret = malloc((img.height * img.width) * sizeof(Color));
   Color *contents = LoadImageColors(img);
@@ -202,29 +176,21 @@ texture_t load_engine_texture(char *filename){
   UnloadImage(img);
   return ret;
 }
-// using this because I am going to attempt to off load more to the gpu to see if that will be faster not sure if it will be
-// after thinking about it, it will honestly end up being the same amount of work, I will still have to manually draw pixels strip
-// by strip with this, I can't even offload the wall drawing purely to the CP
-void draw_wall_strip(Vector2 wall_pos,int texture_x,double wall_height,int texture_id){
-  // have to do this due to the way I have to software render some textures I am too dumb to figure out how to do this on gpu
-  if(!gpu_loaded_textures[texture_id].loaded){
-	texture_t engine_text = loaded_textures[texture_id];
-	Image texture_image = {.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,.data = engine_text.contents,.width = engine_text.width,.height = engine_text.height,.mipmaps = 1 };
-	gpu_loaded_textures[texture_id].text = LoadTextureFromImage(texture_image);
-	gpu_loaded_textures[texture_id].loaded = true;
-  }
-  Texture texture = gpu_loaded_textures[texture_id].text;
-  Rectangle texture_rect = {.x = texture_x,.y = 0,.height = texture.height,.width = 1};
-  Rectangle screen_rect = {.x = wall_pos.x,.y = wall_pos.y,.height = wall_height * 2,.width = 1};
-  DrawTexturePro(texture, texture_rect, screen_rect, (Vector2){0.0f,0.0f},0.0f, WHITE);
+
+cell_t *get_map_cell(int x,int y)
+{
+  return &map_data.data[x * map_data.height + y];
 }
-void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture){
+
+void draw_texture(Vector2 wall_pos,int texture_x,double wall_height,texture_t texture,float brightness){
   float y_inc = (wall_height * 2) / texture.height;
   int col = (texture_x * texture.height);
   for(int i = 0;i < texture.height;i++){
 	Vector2 line_start = {.x = wall_pos.x, .y = wall_pos.y};
 	Vector2 line_end = {.x = wall_pos.x, .y = wall_pos.y += y_inc};
-	ImageDrawLineV(&FrameBuffer,line_start, line_end,texture.contents[col + i]);
+	Color text_color = texture.contents[col + i];
+	Color augmented_color = {.r = text_color.r * brightness,.g = text_color.g * brightness, .b = text_color.b * brightness,.a = text_color.a};
+	ImageDrawLineV(&FrameBuffer,line_start, line_end,augmented_color);
   }
 }
 
@@ -239,14 +205,20 @@ void draw_ceiling(int x,float wall_height,float rayCos,float raySin){
   float start = 0;
   float y = start;
   for(;y < project.height - wall_height;){
-	float dist = project.height / (project.height - 2 * y);
+	float dist = project.height / (project.height - 2  * y);
+	/* float brightness = 1; */
+	float brightness = 1 / dist;
+	brightness = clampf(brightness, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+	/* float brightness = brightness_lookup_table[(int)dist]; */
 	float tilex = dist * rayCos;
 	float tiley = dist * raySin;
-	tilex += player.x;
-	tiley += player.y;
+	tilex += player.pos.x;
+	tiley += player.pos.y;
 	int text_x = (int)(tilex * ceiling_text.width) & (ceiling_text.width - 1);
 	int text_y = (int)(tiley * ceiling_text.height) & (ceiling_text.height - 1);
-	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},ceiling_text.contents[text_x * ceiling_text.height + text_y]);
+	Color text_color = ceiling_text.contents[text_x * ceiling_text.height + text_y];
+	Color augmented_color = {.r = text_color.r * brightness,.g = text_color.g * brightness, .b = text_color.b * brightness,.a = text_color.a};
+	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},augmented_color);
 	y++;
   }
 }
@@ -256,15 +228,21 @@ void draw_floor(int x,float wall_height,float rayCos,float raySin){
   float y = start;
   for(;y < project.height;){
 	float dist = project.height / (2 * y - project.height);
+	/* float brightness = 1; */
+	float brightness  = 1 / dist;
+	brightness = clampf(brightness, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+	//float brightness = brightness_lookup_table[(int)dist];
 	float tilex = dist * rayCos;
 	float tiley = dist * raySin;
-	tilex += player.x;
-	tiley += player.y;
-	cell_t floor_cell = worldMap[(int)tiley][(int)tilex];
-	texture_t floor_text = loaded_textures[floor_cell.texture_id];
+	tilex += player.pos.x;
+	tiley += player.pos.y;
+	cell_t *floor_cell = get_map_cell((int)tilex, (int)tiley);
+	texture_t floor_text = loaded_textures[floor_cell->texture_id];
 	int text_x = (int)(tilex * floor_text.width) & (floor_text.width - 1);
 	int text_y = (int)(tiley * floor_text.height) & (floor_text.height - 1);
-	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},floor_text.contents[text_x * floor_text.height + text_y]);
+	Color text_color = floor_text.contents[text_x * floor_text.height + text_y];
+	Color augmented_color = {.r = text_color.r * brightness,.g = text_color.g * brightness, .b = text_color.b * brightness,.a = text_color.a};
+	ImageDrawPixelV(&FrameBuffer,(Vector2){.x = x,.y = y},augmented_color);
 	y++;
   }
 }
@@ -278,22 +256,22 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 	float side_dist_y;
 	int step_x;
 	int step_y;
-	int mapx = (int)player.x;
-	int mapy = (int)player.y;
+	int mapx = (int)player.pos.x;
+	int mapy = (int)player.pos.y;
 	int side;
 	if(rayCos < 0){
 	  step_x = -1;
-	  side_dist_x = (player.x - (float)mapx) *delta_dist_x;
+	  side_dist_x = (player.pos.x - (float)mapx) *delta_dist_x;
 	}else{
 	  step_x = 1;
-	  side_dist_x = ((float)mapx + 1.0 - player.x) * delta_dist_x;
+	  side_dist_x = ((float)mapx + 1.0 - player.pos.x) * delta_dist_x;
 	}
 	if(raySin < 0){
 	  step_y = -1;
-	  side_dist_y = (player.y - (float)mapy) *delta_dist_y;
+	  side_dist_y = (player.pos.y - (float)mapy) *delta_dist_y;
 	}else{
 	  step_y = 1;
-	  side_dist_y = ((float)mapy + 1.0 - player.y) * delta_dist_y;
+	  side_dist_y = ((float)mapy + 1.0 - player.pos.y) * delta_dist_y;
 	}
 	while(!wall){
 	  if(side_dist_x < side_dist_y){
@@ -305,19 +283,20 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 		mapy += step_y;
 		side  = 1;
 	  }
-	  wall = worldMap[mapy][mapx].type;
+	  wall = get_map_cell(mapx, mapy)->type;
 	}
-	cell_t wall_cell = worldMap[mapy][mapx];
+	cell_t wall_cell = *get_map_cell(mapx, mapy);
 	float dist;
 	float hitx;
 	if(side == 0){
 	  dist = (side_dist_x - delta_dist_x);
-	  hitx = player.y + (dist * raySin);
+	  hitx = player.pos.y + (dist * raySin);
 	}
 	else{
 	  dist = (side_dist_y - delta_dist_y);
-	  hitx = player.x + (dist * rayCos);
+	  hitx = player.pos.x + (dist * rayCos);
 	}
+	//printf("dist = %f\n", dist);
 	hitx -= floorf(hitx);
 	float wall_height = (float)project.half_height / dist;
 	Vector2 wall_pos = {.x = ray_cnt, .y = project.half_height - wall_height};
@@ -326,8 +305,11 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
 	if(!enable_skybox){
 	  draw_ceiling(ray_cnt, wall_height, rayCos, raySin);
 	}
-	draw_texture(wall_pos,texture_pos,wall_height,texture);
-	//draw_wall_strip(wall_pos, texture_pos, wall_height,wall_cell.texture_id);
+	/* float strip_brightness = 1; */
+	float strip_brightness = 1.0 / dist;
+	/* float strip_brightness = brightness_lookup_table[(int)dist]; */
+	strip_brightness = clampf(strip_brightness, MIN_BRIGHTNESS,MAX_BRIGHTNESS);
+	draw_texture(wall_pos,texture_pos,wall_height,texture,strip_brightness);
 	draw_floor(ray_cnt, wall_height, rayCos, raySin);
 	float new_cos = rayCos * cosDelta - raySin * sinDelta;
 	raySin = raySin * cosDelta +  rayCos  * sinDelta;
@@ -337,88 +319,45 @@ void raycast(float ray_angle,float raySin, float rayCos,float cosDelta, float si
   }
   
 }
-// for now it's just one sprite
-/* void draw_sprites(){ */
-/*   sprite_t sprite = sprites[0]; */
-/*   float dx = sprite.x - player.x; */
-/*   float dy = sprite.y - player.y; */
-/*   float dz = sprite.z; */
-/*   float pa_radians = DEGREE_TO_RADIANS(player.pa); */
-/*   float pa_sin = sinf(pa_radians); */
-/*   float pa_cos = cosf(pa_radians); */
-/*   // rotated around players angle */
-/*   float a=dy*pa_cos+dx*pa_sin; */
-/*   float b=dx*pa_cos-dy*pa_sin; */
-/*   // 3d projection onto the screen */
-/*   float screen_x = (a /b)+(project.half_width); */
-/*   float screen_y = (dz/ b)+(project.half_height); */
-/*   #ifdef DEBUG */
-/*   printf("dx = %f, dy = %f   a = %f b = %f, screen_y = %f, screen_x %f\n",dx,dy,a,b,screen_y,screen_x); */
-/*   #endif */
-/*   if(b < 0) */
-/* 	return; */
-/*   ImageDrawRectangleV(&FrameBuffer, (Vector2){.x = screen_x,.y = screen_y}, (Vector2){.x = 100,.y = 100}, YELLOW); */
-/* } */
 
 void draw_sprites(void)
 {
-    sprite_t sprite = sprites[0];
-
+  float angle = DEGREE_TO_RADIANS(player.pa);  
+  float pa_sin = sinf(angle);
+  float pa_cos = cosf(angle);
+  for(int i = 0; i < 3;i++){
+    sprite_t sprite = sprites[i];
     // Sprite position relative to player.
-    float dx = sprite.x - player.x;
-    float dy = sprite.y - player.y;
-
-    float angle = DEGREE_TO_RADIANS(player.pa);
-    float pa_sin = sinf(angle);
-    float pa_cos = cosf(angle);
-
+    float dx = sprite.x - player.pos.x;
+    float dy = sprite.y - player.pos.y;
     // Transform world position into camera space.
     float depth =  dx * pa_cos + dy * pa_sin;
     float side  = -dx * pa_sin + dy * pa_cos;
-
-    // Behind the camera or too close to project safely.
-    /* if (depth <= 0.001f) { */
-    /*     return; */
-    /* } */
-
-    // Outside horizontal FOV.
-    if (fabsf(side) > depth) {
-        return;
+	float brightness = 1 / depth;
+	//float brightness = brightness_lookup_table[(int)depth];
+	brightness = clampf(brightness, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+	/* float brightness = 1; */
+	#ifdef DEBUG
+	if(i == 1){
+	  printf("sprite[1] dx = %f dy = %f depth = %f, side = %f\n",dx,dy,depth,side);
     }
-
-    float focal_length =
-        (float)project.half_width;
-
-    // Horizontal screen coordinate of the sprite's center.
-    float screen_x =
-        (float)project.half_width +
-        (side / depth) * focal_length;
-
-    /*
-     * Example vertical setup:
-     *
-     * z = 0 is the floor.
-     * Camera is 0.5 world units above the floor.
-     * sprite.z is the sprite's floor/base position.
-     */
-    const float camera_z = 0.5f;
-    const float sprite_world_width = 0.5f;
-    const float sprite_world_height = 0.5f;
-
+	#endif
+	// Behind the camera or too close to project safely.
+	if (depth <= 0.001f) {
+	  continue;
+	}
+	/* Outside horizontal FOV. */
+    /* if (fabsf(side) > depth) { */
+	/*   return; */
+    /* } */
+    float focal_length = (float)project.half_width;
+    float screen_x = (float)project.half_width + (side / depth) * focal_length;
     float sprite_bottom_z = sprite.z;
     float sprite_top_z = sprite.z + sprite.wrld_height;
-
-  
-    float screen_bottom =(float)project.half_height -((sprite_bottom_z - camera_z) / depth) * focal_length;
-
-    float screen_top = (float)project.half_height -((sprite_top_z - camera_z) / depth) * focal_length;
-
+    float screen_bottom =(float)project.half_height -((sprite_bottom_z - player.pos.z) / depth) * focal_length;
+    float screen_top = (float)project.half_height -((sprite_top_z - player.pos.z) / depth) * focal_length;
     float screen_width = (sprite.wrld_width / depth) * focal_length;
-
     float screen_height = screen_bottom - screen_top;
-
-    // screen_x represents the center, while ImageDrawRectangleV receives
-    // a rectangle position and size. :contentReference[oaicite:1]{index=1}
 	float draw_start_x = screen_x - screen_width * 0.5f;
 	float draw_end_x = screen_x + screen_width;
 	float draw_start_y = screen_top;
@@ -435,16 +374,18 @@ void draw_sprites(void)
 		  float v =  (y - draw_start_y) / screen_height;
 		  int texture_y = v * sprite.spr_txt.height;
 		  if(texture_y >= sprite.spr_txt.height){
-				texture_y = sprite.spr_txt.height - 1;
+			texture_y = sprite.spr_txt.height - 1;
 		  }
 		  if(sprite.spr_txt.contents[col + texture_y].a == 0){
 			continue;
 		  }
-		  ImageDrawPixel(&FrameBuffer,strip,y,sprite.spr_txt.contents[col + texture_y]);
+		  Color text_color = sprite.spr_txt.contents[col + texture_y];
+		  Color augmented_color = {.r = text_color.r * brightness,.g = text_color.g * brightness, .b = text_color.b * brightness,.a = text_color.a};
+		  ImageDrawPixel(&FrameBuffer,strip,y,augmented_color);
 		}
 	  }
-	}
-    //ImageDrawRectangleV(&FrameBuffer, position, size, YELLOW);
+	}   
+  }
 }
 
 void render(){
@@ -493,41 +434,41 @@ void player_input(){
   float paCos = cos(DEGREE_TO_RADIANS(player.pa)) * speed;
   float paSin = sin(DEGREE_TO_RADIANS(player.pa)) * speed;
   if(IsKeyDown(KEY_W)){
-	float new_player_x = 	player.x + paCos;
-	float new_player_y = 	player.y + paSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
-	  player.x = new_player_x;
-	  player.y = new_player_y;
+	float new_player_x = 	player.pos.x + paCos;
+	float new_player_y = 	player.pos.y + paSin;
+	if(!(get_map_cell(new_player_x,new_player_y)->type)){
+	  player.pos.x = new_player_x;
+	  player.pos.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_S)){
-	float new_player_x = 	player.x - paCos;
-	float new_player_y = 	player.y - paSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
-	  player.x = new_player_x;
-	  player.y = new_player_y;
+	float new_player_x = 	player.pos.x - paCos;
+	float new_player_y = 	player.pos.y - paSin;
+	if(!(get_map_cell(new_player_x,new_player_y)->type)){
+	  player.pos.x = new_player_x;
+	  player.pos.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_A)){
 	float angle_in_radians = DEGREE_TO_RADIANS(player.pa);
 	float strfCos = cosf( angle_in_radians - PI/2) * speed;
 	float strfSin = sinf(angle_in_radians - PI/2) * speed;
-	float new_player_x = 	player.x + strfCos;
-	float new_player_y = 	player.y + strfSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
-	  player.x = new_player_x;
-	  player.y = new_player_y;
+	float new_player_x = 	player.pos.x + strfCos;
+	float new_player_y = 	player.pos.y + strfSin;
+	if(!(get_map_cell(new_player_x,new_player_y)->type)){
+	  player.pos.x = new_player_x;
+	  player.pos.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_D)){
 	float angle_in_radians = DEGREE_TO_RADIANS(player.pa);
 	float strfCos = cosf(angle_in_radians + PI/2) * speed;
 	float strfSin = sinf(angle_in_radians + PI/2) * speed;
-	float new_player_x = 	player.x + strfCos;
-	float new_player_y = 	player.y + strfSin;
-	if(!worldMap[(int)new_player_y][(int)new_player_x].type){
-	  player.x = new_player_x;
-	  player.y = new_player_y;
+	float new_player_x = 	player.pos.x + strfCos;
+	float new_player_y = 	player.pos.y + strfSin;
+	if(!(get_map_cell(new_player_x,new_player_y)->type)){
+	  player.pos.x = new_player_x;
+	  player.pos.y = new_player_y;
 	}
   }
   if(IsKeyDown(KEY_F1)){
@@ -552,10 +493,8 @@ void player_input(){
 }
 
 void init_screen(){
-  // SetConfigFlags(FLAG_FULLSCREEN_MODE);
   InitWindow(screen.width, screen.height, "Raycasting");
   DisableCursor();
-  //SetTargetFPS(60);
   project.width = screen.width / screen.proj_scale;
   project.height = screen.height / screen.proj_scale;
   project.half_width = project.width / 2;
@@ -564,6 +503,22 @@ void init_screen(){
   FrameBuffer = GenImageColor(project.width, project.height, BLANK);
   FrameText = LoadTextureFromImage(FrameBuffer);
   zbuffer = calloc(project.width, sizeof(float));
+}
+
+void setup_brightness_lookup_table()
+{
+  int longest_dist;
+  if(map_data.height > map_data.width){
+	longest_dist = map_data.height;
+  }else{
+	longest_dist = map_data.width;
+  }
+  brightness_lookup_table = calloc(longest_dist,sizeof(float));
+  for(int i = 0;i < longest_dist; i++){
+	float brightness = 1.0f / (float)(i);
+	brightness = clampf(brightness, MIN_BRIGHTNESS, MAX_BRIGHTNESS);
+	brightness_lookup_table[i] = brightness;
+  }
 }
 
 void load_textures(){
@@ -578,20 +533,31 @@ void load_textures(){
   sprites[0].z = -0.1f;
   sprites[0].wrld_height = 1.0f;
   sprites[0].wrld_width = 1.0f;
+  sprites[1].x = 13.5f;
+  sprites[1].y = 13.5f;
+  sprites[1].z = -0.1f;
+  sprites[1].wrld_height = 1.0f;
+  sprites[1].wrld_width = 1.0f;
+  sprites[1].spr_txt = load_engine_texture("folkcat.png");
+  sprites[2].x = 14.5f;
+  sprites[2].y = 14.5f;
+  sprites[2].wrld_height = 1.0f;
+  sprites[2].wrld_width = 0.5f;
+  sprites[2].spr_txt = load_engine_texture("slenderman.png");
 }
 
 
 int main()
 {
   init_screen();
- 
+  setup_brightness_lookup_table();
   load_textures();
   while(!WindowShouldClose()){
 	render();
 	player_input();
 #ifdef DEBUG
-	printf("player x = %f player y = %f, player.pa = %f\n\r",player.x,player.y,player.pa);
-	printf("sprite x = %f sprite y = %f sprite_z = %f\n",sprites[0].x,sprites[0].y,sprites[0].z);
+	printf("player x = %f player y = %f, player.pa = %f\n\r",player.pos.x,player.pos.y,player.pa);
+	/* printf("sprite x = %f sprite y = %f sprite_z = %f\n",sprites[0].x,sprites[0].y,sprites[0].z); */
 #endif
   }
   CloseWindow();
